@@ -40,11 +40,25 @@ import com.example.studysmart.domain.model.Subject
 import com.example.studysmart.presentation.components.DeleteDialog
 import com.example.studysmart.presentation.components.SubjectListBottomSheet
 import com.example.studysmart.presentation.components.studySessionsList
+import com.ramcosta.composedestinations.annotation.Destination
+import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import kotlinx.coroutines.launch
+
+@Destination
+@Composable
+fun SessionScreenRoute(
+    navigator: DestinationsNavigator
+) {
+    SessionScreen(
+        onBackButtonClick = { navigator.navigateUp() }
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SessionScreen() {
+private fun SessionScreen(
+    onBackButtonClick: () -> Unit,
+) {
 
     val subjects = listOf(
         Subject(name = "English", goalHours = 10f, colors = Subject.subjectCardColors[0], subjectId = 0),
@@ -123,7 +137,7 @@ fun SessionScreen() {
 
     Scaffold(
         topBar = {
-            SessionScreenTopBar(onBackButtonClick = {})
+            SessionScreenTopBar(onBackButtonClick = onBackButtonClick)
         }
     ) { paddingValues ->
         LazyColumn(
