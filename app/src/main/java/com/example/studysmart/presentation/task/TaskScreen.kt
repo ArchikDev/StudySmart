@@ -42,11 +42,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.studysmart.domain.model.Subject
 import com.example.studysmart.presentation.components.DeleteDialog
 import com.example.studysmart.presentation.components.SubjectListBottomSheet
 import com.example.studysmart.presentation.components.TaskCheckBox
 import com.example.studysmart.presentation.components.TaskDatePicker
+import com.example.studysmart.presentation.session.SessionViewModel
 import com.example.studysmart.presentation.theme.Red
 import com.example.studysmart.util.Priority
 import com.example.studysmart.util.changeMillisToDateString
@@ -65,6 +67,9 @@ data class TaskScreenNavArgs(
 fun TaskScreenRoute(
     navigator: DestinationsNavigator
 ) {
+
+    val viewModel: TaskViewModel = hiltViewModel()
+
     TaskScreen(
         onBackButtonClick = { navigator.navigateUp() }
     )
