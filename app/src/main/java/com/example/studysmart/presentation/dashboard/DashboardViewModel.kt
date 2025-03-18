@@ -29,10 +29,9 @@ class DashboardViewModel @Inject constructor(
     private val subjectRepository: SubjectRepository,
     private val sessionRepository: SessionRepository,
     private val taskRepository: TaskRepository
-): ViewModel() {
+) : ViewModel() {
 
     private val _state = MutableStateFlow(DashboardState())
-
     val state = combine(
         _state,
         subjectRepository.getTotalSubjectCount(),
@@ -96,7 +95,7 @@ class DashboardViewModel @Inject constructor(
             }
 
             DashboardEvent.SaveSubject -> saveSubject()
-            DashboardEvent.DeleteSession -> {}
+            DashboardEvent.DeleteSession -> deleteSession()
             is DashboardEvent.OnTaskIsCompleteChange -> {
                 updateTask(event.task)
             }
@@ -154,5 +153,24 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    private fun deleteSession() {
+        viewModelScope.launch {
+            try {
+                state.value.session?.let {
+                    sessionRepository.deleteSession(it)
+                    _snackbarEventFlow.emit(
+                        SnackbarEvent.ShowSnackbar(message = "Session deleted successfully")
+                    )
+                }
+            } catch (e: Exception) {
+                _snackbarEventFlow.emit(
+                    SnackbarEvent.ShowSnackbar(
+                        message = "Couldn't delete session. ${e.message}",
+                        duration = SnackbarDuration.Long
+                    )
+                )
+            }
+        }
+    }
 
 }
