@@ -25,10 +25,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +45,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.studysmart.domain.model.Session
 import com.example.studysmart.domain.model.Subject
 import com.example.studysmart.domain.model.Task
@@ -53,8 +57,11 @@ import com.example.studysmart.presentation.components.tasksList
 import com.example.studysmart.presentation.destinations.TaskScreenRouteDestination
 import com.example.studysmart.presentation.session.SessionViewModel
 import com.example.studysmart.presentation.task.TaskScreenNavArgs
+import com.example.studysmart.util.SnackbarEvent
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.collectLatest
 
 data class SubjectScreenNavArgs(
     val subjectId: Int
@@ -65,21 +72,21 @@ data class SubjectScreenNavArgs(
 fun SubjectScreenRoute(
     navigator: DestinationsNavigator
 ) {
-
     val viewModel: SubjectViewModel = hiltViewModel()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     SubjectScreen(
+        state = state,
+        onEvent = viewModel::onEvent,
+        snackbarEvent = viewModel.snackbarEventFlow,
         onBackButtonClick = { navigator.navigateUp() },
         onAddTaskButtonClick = {
-            val navArg = TaskScreenNavArgs(taskId = null, subjectId = -1)
+            val navArg = TaskScreenNavArgs(taskId = null, subjectId = state.currentSubjectId)
             navigator.navigate(TaskScreenRouteDestination(navArgs = navArg))
         },
-        onTaskCardClick = {taskId ->
-            taskId?.let {
-                val navArg = TaskScreenNavArgs(taskId = taskId, subjectId = null)
-                navigator.navigate(TaskScreenRouteDestination(navArgs = navArg))
-            }
-
+        onTaskCardClick = { taskId ->
+            val navArg = TaskScreenNavArgs(taskId = taskId, subjectId = null)
+            navigator.navigate(TaskScreenRouteDestination(navArgs = navArg))
         }
     )
 }
@@ -87,101 +94,13 @@ fun SubjectScreenRoute(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SubjectScreen(
+    state: SubjectState,
+    onEvent: (SubjectEvent) -> Unit,
+    snackbarEvent: SharedFlow<SnackbarEvent>,
     onBackButtonClick: () -> Unit,
     onAddTaskButtonClick: () -> Unit,
-    onTaskCardClick: (Int?) -> Unit,
+    onTaskCardClick: (Int?) -> Unit
 ) {
-
-    val tasks = listOf(
-        Task(
-            title = "Prepare notes",
-            description = "",
-            dueDate = 0L,
-            priority = 0,
-            relatedToSubject = "",
-            isComplete = false,
-            taskSubjectId = 0,
-            taskId = 1,
-        ),
-        Task(
-            title = "Do Homework",
-            description = "",
-            dueDate = 0L,
-            priority = 1,
-            relatedToSubject = "",
-            isComplete = true,
-            taskSubjectId = 0,
-            taskId = 1,
-        ),
-        Task(
-            title = "Go Coaching",
-            description = "",
-            dueDate = 0L,
-            priority = 2,
-            relatedToSubject = "",
-            isComplete = false,
-            taskSubjectId = 0,
-            taskId = 1,
-        ),
-        Task(
-            title = "Assigment",
-            description = "",
-            dueDate = 0L,
-            priority = 1,
-            relatedToSubject = "",
-            isComplete = false,
-            taskSubjectId = 0,
-            taskId = 1,
-        ),
-        Task(
-            title = "Write Poem",
-            description = "",
-            dueDate = 0L,
-            priority = 0,
-            relatedToSubject = "",
-            isComplete = true,
-            taskSubjectId = 0,
-            taskId = 1,
-        )
-
-    )
-    val sessions = listOf(
-        Session(
-            relatedToSubject = "English",
-            date = 0L,
-            duration = 2,
-            sessionSubjectId = 0,
-            sessionId = 0
-        ),
-        Session(
-            relatedToSubject = "Physics",
-            date = 0L,
-            duration = 2,
-            sessionSubjectId = 0,
-            sessionId = 0
-        ),
-        Session(
-            relatedToSubject = "Maths",
-            date = 0L,
-            duration = 2,
-            sessionSubjectId = 0,
-            sessionId = 0
-        ),
-        Session(
-            relatedToSubject = "English",
-            date = 0L,
-            duration = 2,
-            sessionSubjectId = 0,
-            sessionId = 0
-        ),
-        Session(
-            relatedToSubject = "English",
-            date = 0L,
-            duration = 2,
-            sessionSubjectId = 0,
-            sessionId = 0
-        ),
-    )
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val listState = rememberLazyListState()
@@ -191,20 +110,40 @@ private fun SubjectScreen(
     var isDeleteSubjectDialogOpen by rememberSaveable { mutableStateOf(false) }
     var isDeleteSessionDialogOpen by rememberSaveable { mutableStateOf(false) }
 
-    var subjectName by remember { mutableStateOf("") }
-    var goalHours by remember { mutableStateOf("") }
-    var selectedColor by remember { mutableStateOf(Subject.subjectCardColors.random()) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(key1 = true) {
+        snackbarEvent.collectLatest { event ->
+            when (event) {
+                is SnackbarEvent.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(
+                        message = event.message,
+                        duration = event.duration
+                    )
+                }
+
+                SnackbarEvent.NavigateUp -> {
+                    onBackButtonClick()
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(key1 = state.studiedHours, key2 = state.goalStudyHours) {
+        onEvent(SubjectEvent.UpdateProgress)
+    }
 
     AddSubjectDialog(
         isOpen = isEditSubjectDialogOpen,
-        subjectName = subjectName,
-        goalHours = goalHours,
-        onSubjectNameChange = { subjectName = it },
-        onGoalHoursChange = { goalHours = it },
-        selectedColors = selectedColor,
-        onColorChange = { selectedColor = it },
+        subjectName = state.subjectName,
+        goalHours = state.goalStudyHours,
+        onSubjectNameChange = { onEvent(SubjectEvent.OnSubjectNameChange(it)) },
+        onGoalHoursChange = { onEvent(SubjectEvent.OnGoalStudyHoursChange(it)) },
+        selectedColors = state.subjectCardColors,
+        onColorChange = { onEvent(SubjectEvent.OnSubjectCardColorChange(it)) },
         onDismissRequest = { isEditSubjectDialogOpen = false },
         onConfirmButtonClick = {
+            onEvent(SubjectEvent.UpdateSubject)
             isEditSubjectDialogOpen = false
         }
     )
@@ -215,7 +154,10 @@ private fun SubjectScreen(
         bodyText = "Are you sure, you want to delete this subject? All related " +
                 "tasks and study sessions will be permanently removed. This action can not be undone",
         onDismissRequest = { isDeleteSubjectDialogOpen = false },
-        onConfirmButtonClick = { isDeleteSubjectDialogOpen = false }
+        onConfirmButtonClick = {
+            onEvent(SubjectEvent.DeleteSubject)
+            isDeleteSubjectDialogOpen = false
+        }
     )
 
     DeleteDialog(
@@ -224,17 +166,21 @@ private fun SubjectScreen(
         bodyText = "Are you sure, you want to delete this session? Your studied hours will be reduced " +
                 "by this session time. This action can not be undone.",
         onDismissRequest = { isDeleteSessionDialogOpen = false },
-        onConfirmButtonClick = { isDeleteSessionDialogOpen = false }
+        onConfirmButtonClick = {
+            onEvent(SubjectEvent.DeleteSession)
+            isDeleteSessionDialogOpen = false
+        }
     )
 
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             SubjectScreenTopBar(
-                title = "English",
+                title = state.subjectName,
                 onBackButtonClick = onBackButtonClick,
-                onDeleteButtonClick = { isDeleteSubjectDialogOpen = true},
-                onEditButtonClick = { isEditSubjectDialogOpen = true},
+                onDeleteButtonClick = { isDeleteSubjectDialogOpen = true },
+                onEditButtonClick = { isEditSubjectDialogOpen = true },
                 scrollBehavior = scrollBehavior
             )
         },
@@ -258,17 +204,17 @@ private fun SubjectScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(12.dp),
-                    studiedHours = "10",
-                    goalHours = "15",
-                    progress = 0.75f
+                    studiedHours = state.studiedHours.toString(),
+                    goalHours = state.goalStudyHours,
+                    progress = state.progress
                 )
             }
             tasksList(
                 sectionTitle = "UPCOMING TASKS",
                 emptyListText = "You don't have any upcoming tasks.\n " +
                         "Click the + button to add new task.",
-                tasks = tasks,
-                onCheckBoxClick = {},
+                tasks = state.upcomingTasks,
+                onCheckBoxClick = { onEvent(SubjectEvent.OnTaskIsCompleteChange(it)) },
                 onTaskCardClick = onTaskCardClick
             )
             item {
@@ -278,8 +224,8 @@ private fun SubjectScreen(
                 sectionTitle = "COMPLETED TASKS",
                 emptyListText = "You don't have any completed tasks.\n " +
                         "Click the check box on completion of task.",
-                tasks = tasks,
-                onCheckBoxClick = {},
+                tasks = state.completedTasks,
+                onCheckBoxClick = { onEvent(SubjectEvent.OnTaskIsCompleteChange(it)) },
                 onTaskCardClick = onTaskCardClick
             )
             item {
@@ -289,8 +235,11 @@ private fun SubjectScreen(
                 sectionTitle = "RECENT STUDY SESSIONS",
                 emptyListText = "You don't have any recent study sessions.\n " +
                         "Start a study session to begin recording your progress.",
-                sessions = sessions,
-                onDeleteIconClick = { isDeleteSessionDialogOpen = true }
+                sessions = state.recentSessions,
+                onDeleteIconClick = {
+                    isDeleteSessionDialogOpen = true
+                    onEvent(SubjectEvent.OnDeleteSessionButtonClick(it))
+                }
             )
         }
     }
@@ -347,7 +296,7 @@ private fun SubjectOverviewSection(
     goalHours: String,
     progress: Float
 ) {
-    val percentageProgress = remember(progress) {
+    val percentageProgress = remember(key1 = progress) {
         (progress * 100).toInt().coerceIn(0, 100)
     }
 
@@ -364,7 +313,7 @@ private fun SubjectOverviewSection(
         Spacer(modifier = Modifier.width(10.dp))
         CountCard(
             modifier = Modifier.weight(1f),
-            headingText = "Study Hours",
+            headingText = "Studied Hours",
             count = studiedHours
         )
         Spacer(modifier = Modifier.width(10.dp))
