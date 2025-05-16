@@ -13,7 +13,7 @@ object ServiceHelper {
     fun clickPendingIntent(context: Context): PendingIntent {
         val deepLinkIntent = Intent(
             Intent.ACTION_VIEW,
-            "study_smart://dashboard/session".toUri(),
+            "study_smart://dashboard/session".toUri() /* deep link на какой экран перейти */ ,
             context,
             MainActivity::class.java
         )

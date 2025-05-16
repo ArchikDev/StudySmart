@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            if (isBound) {
+            if (isBound) { // для того чтобы передать сервис т.е. его таймер в iu для отображения
                 StudySmartTheme {
                     DestinationsNavHost(
                         navGraph = NavGraphs.root,
